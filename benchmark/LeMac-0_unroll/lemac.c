@@ -15,15 +15,17 @@ along with this software. If not, see
 */
 
 /* NOTES 
- - This file implements the correct version of LeMac, fixing a mistake
-   in the message schedule in the original specification
+ - This file implements LeMac-0, the erroneous version in the inital paper
  - Assumes that the message size is a multiple of 8bits
  - Assumes that endianness matches the hardware
+ - WARNING! This unrolled implementation is only valid for long messages!
  */
 
 #include <stdint.h>
 #include <immintrin.h>
 #include <string.h>
+#include <stdio.h>
+
 
 #define STATE_0 _mm_set_epi64x(0,0)
 
@@ -142,21 +144,16 @@ void lemac_init(context *ctx, const uint8_t k[]) {
 }
 
 
-#define ROUND(S, M0, M1, M2, M3, RR, R0, R1, R2) do {           \
-    __m128i T = S.S[8];						\
-    S.S[8] = _mm_aesenc_si128(S.S[7],M3);			\
-    S.S[7] = _mm_aesenc_si128(S.S[6],M1);			\
-    S.S[6] = _mm_aesenc_si128(S.S[5],M1);			\
-    S.S[5] = _mm_aesenc_si128(S.S[4],M0);			\
-    S.S[4] = _mm_aesenc_si128(S.S[3],M0);			\
-    S.S[3] = _mm_aesenc_si128(S.S[2],R1 ^ R2);			\
-    S.S[2] = _mm_aesenc_si128(S.S[1],M3);			\
-    S.S[1] = _mm_aesenc_si128(S.S[0],M3);			\
-    S.S[0] = S.S[0] ^ T ^ M2;					\
-    R2 = R1;                                                    \
-    R1 = R0;                                                    \
-    R0 = RR ^ M1;                                               \
-    RR = M2;                                                    \
+#define ROUND(S0, S1, S2, S3, S4, S5, S6, S7, S8, M, MM) do {	\
+    S8^= S0 ^ M[2];						\
+    S0 = _mm_aesenc_si128(S0,M[3]);				\
+    S1 = _mm_aesenc_si128(S1,M[3]);				\
+    S2 = _mm_aesenc_si128(S2,MM);				\
+    S3 = _mm_aesenc_si128(S3,M[0]);				\
+    S4 = _mm_aesenc_si128(S4,M[0]);				\
+    S5 = _mm_aesenc_si128(S5,M[1]);				\
+    S6 = _mm_aesenc_si128(S6,M[1]);				\
+    S7 = _mm_aesenc_si128(S7,M[3]);				\
   } while (0);
 
 state lemac_AU(context *ctx, const uint8_t *m, size_t mlen) {
@@ -174,25 +171,128 @@ state lemac_AU(context *ctx, const uint8_t *m, size_t mlen) {
   const __m128i *M = (__m128i*)m;
   __m128i *Mfin = (__m128i*)(m + m_padded_len - 64);
 
-  state S = ctx->init;
+  __m128i S0 = ctx->init.S[0];
+  __m128i S1 = ctx->init.S[1];
+  __m128i S2 = ctx->init.S[2];
+  __m128i S3 = ctx->init.S[3];
+  __m128i S4 = ctx->init.S[4];
+  __m128i S5 = ctx->init.S[5];
+  __m128i S6 = ctx->init.S[6];
+  __m128i S7 = ctx->init.S[7];
+  __m128i S8 = ctx->init.S[8];
 
-  __m128i RR = STATE_0;
-  __m128i R0 = STATE_0;
-  __m128i R1 = STATE_0;
-  __m128i R2 = STATE_0;
-  // Main rounds
-  for (;M < Mfin; M+=4) {
-    ROUND(S, M[0], M[1], M[2], M[3], RR, R0, R1, R2);
+  if (mlen < 192) {
+    fprintf (stderr, "Error: this implementation does not support short messages!\n");
+    exit(-1);
+  }
+  
+  // Unroll first three rounds because the initial message is empty
+  ROUND(S0, S1, S2, S3, S4, S5, S6, S7, S8, M, STATE_0);
+  M += 4;
+  ROUND(S8, S0, S1, S2, S3, S4, S5, S6, S7, M, M[-3]);
+  M += 4;
+  ROUND(S7, S8, S0, S1, S2, S3, S4, S5, S6, M, M[-7]^M[-6]^M[-3]);
+  M += 4;
+
+  // Unroll blocks of 9 rounds
+  for (;M+4*8 < Mfin;) {
+    ROUND(S6, S7, S8, S0, S1, S2, S3, S4, S5, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+    ROUND(S5, S6, S7, S8, S0, S1, S2, S3, S4, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+    ROUND(S4, S5, S6, S7, S8, S0, S1, S2, S3, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+    ROUND(S3, S4, S5, S6, S7, S8, S0, S1, S2, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+    ROUND(S2, S3, S4, S5, S6, S7, S8, S0, S1, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+    ROUND(S1, S2, S3, S4, S5, S6, S7, S8, S0, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+    ROUND(S0, S1, S2, S3, S4, S5, S6, S7, S8, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+    ROUND(S8, S0, S1, S2, S3, S4, S5, S6, S7, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+    ROUND(S7, S8, S0, S1, S2, S3, S4, S5, S6, M, M[-10]^M[-7]^M[-6]^M[-3]);
+    M+=4;
+  }
+
+  state S = {.S = {S6, S7, S8, S0, S1, S2, S3, S4, S5}};
+
+  // Final rounds in-place
+  for (; M<Mfin; M+=4) {
+    state T;
+    T.S[0] = S.S[0] ^ S.S[8] ^ M[2];
+    T.S[1] = _mm_aesenc_si128(S.S[0],M[3]);
+    T.S[2] = _mm_aesenc_si128(S.S[1],M[3]);
+    T.S[3] = _mm_aesenc_si128(S.S[2],M[-10]^M[-7]^M[-6]^M[-3]);
+    T.S[4] = _mm_aesenc_si128(S.S[3],M[0]);
+    T.S[5] = _mm_aesenc_si128(S.S[4],M[0]);
+    T.S[6] = _mm_aesenc_si128(S.S[5],M[1]);
+    T.S[7] = _mm_aesenc_si128(S.S[6],M[1]);
+    T.S[8] = _mm_aesenc_si128(S.S[7],M[3]);
+
+    S = T;
   }
 
   // Last round (padding)
-  ROUND(S, M_padding[0], M_padding[1], M_padding[2], M_padding[3], RR, R0, R1, R2);
+  {
+    state T;
+    T.S[0] = S.S[0] ^ S.S[8] ^ M_padding[2];
+    T.S[1] = _mm_aesenc_si128(S.S[0],M_padding[3]);
+    T.S[2] = _mm_aesenc_si128(S.S[1],M_padding[3]);
+    T.S[3] = _mm_aesenc_si128(S.S[2],M[-10]^M[-7]^M[-6]^M[-3]);
+    T.S[4] = _mm_aesenc_si128(S.S[3],M_padding[0]);
+    T.S[5] = _mm_aesenc_si128(S.S[4],M_padding[0]);
+    T.S[6] = _mm_aesenc_si128(S.S[5],M_padding[1]);
+    T.S[7] = _mm_aesenc_si128(S.S[6],M_padding[1]);
+    T.S[8] = _mm_aesenc_si128(S.S[7],M_padding[3]);
 
-  // Four final rounds to absorb message state
-  ROUND(S, STATE_0, STATE_0, STATE_0, STATE_0, RR, R0, R1, R2);
-  ROUND(S, STATE_0, STATE_0, STATE_0, STATE_0, RR, R0, R1, R2);
-  ROUND(S, STATE_0, STATE_0, STATE_0, STATE_0, RR, R0, R1, R2);
-  ROUND(S, STATE_0, STATE_0, STATE_0, STATE_0, RR, R0, R1, R2);
+    S = T;
+  }
+  
+  // Three final rounds to absorb message state
+  {
+    state T;
+    T.S[0] = S.S[0] ^ S.S[8];
+    T.S[1] = _mm_aesenc_si128(S.S[0],STATE_0);
+    T.S[2] = _mm_aesenc_si128(S.S[1],STATE_0);
+    T.S[3] = _mm_aesenc_si128(S.S[2],M[-6]^M[-3]^M[-2]^M_padding[1]);
+    T.S[4] = _mm_aesenc_si128(S.S[3],STATE_0);
+    T.S[5] = _mm_aesenc_si128(S.S[4],STATE_0);
+    T.S[6] = _mm_aesenc_si128(S.S[5],STATE_0);
+    T.S[7] = _mm_aesenc_si128(S.S[6],STATE_0);
+    T.S[8] = _mm_aesenc_si128(S.S[7],STATE_0);
+
+    S = T;
+  }
+  {
+    state T;
+    T.S[0] = S.S[0] ^ S.S[8];
+    T.S[1] = _mm_aesenc_si128(S.S[0],STATE_0);
+    T.S[2] = _mm_aesenc_si128(S.S[1],STATE_0);
+    T.S[3] = _mm_aesenc_si128(S.S[2],M[-2]^M_padding[1]^M_padding[2]);
+    T.S[4] = _mm_aesenc_si128(S.S[3],STATE_0);
+    T.S[5] = _mm_aesenc_si128(S.S[4],STATE_0);
+    T.S[6] = _mm_aesenc_si128(S.S[5],STATE_0);
+    T.S[7] = _mm_aesenc_si128(S.S[6],STATE_0);
+    T.S[8] = _mm_aesenc_si128(S.S[7],STATE_0);
+
+    S = T;
+  }
+  {
+    state T;
+    T.S[0] = S.S[0] ^ S.S[8];
+    T.S[1] = _mm_aesenc_si128(S.S[0],STATE_0);
+    T.S[2] = _mm_aesenc_si128(S.S[1],STATE_0);
+    T.S[3] = _mm_aesenc_si128(S.S[2],M_padding[2]);
+    T.S[4] = _mm_aesenc_si128(S.S[3],STATE_0);
+    T.S[5] = _mm_aesenc_si128(S.S[4],STATE_0);
+    T.S[6] = _mm_aesenc_si128(S.S[5],STATE_0);
+    T.S[7] = _mm_aesenc_si128(S.S[6],STATE_0);
+    T.S[8] = _mm_aesenc_si128(S.S[7],STATE_0);
+
+    S = T;
+  }
 
   return S;
 }

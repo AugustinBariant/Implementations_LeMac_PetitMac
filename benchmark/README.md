@@ -24,7 +24,7 @@ is not guaranteed to succeed.
 
 If you do not have root access (or do not want to grant root access to
 the script), you can disable root access at the top of the script or run
-it with `NO_ROOT=1 ./bench`
+it with `NO_ROOT=1 ./benchmarks`
 
 
 ## Benchmark results

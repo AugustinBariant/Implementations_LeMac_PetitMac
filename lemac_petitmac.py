@@ -67,9 +67,15 @@ def get_constant(i):
     constant_bytes[0] = i
     return constant_bytes
 
-def lemac_UHF(state, message, verbose=False):
+def lemac_UHF(state, message, verbose=False, version=1):
     assert len(message) % (4*16) == 0, "Message size not a multiple of 4*128 bits"
-    message += [0 for _ in range(3*4*16)]
+    assert(version==0 or version==1)
+    if version == 1:
+        message += [0 for _ in range(4*4*16)]
+        RR = [0 for _ in range(16)]
+    else:
+        message += [0 for _ in range(3*4*16)]
+
     R0 = [0 for _ in range(16)]
     R1 = [0 for _ in range(16)]
     R2 = [0 for _ in range(16)]
@@ -90,17 +96,22 @@ def lemac_UHF(state, message, verbose=False):
         state[2] = xor_bytes(new_state[2],message[(4*i+3)*16:(4*i+4)*16])
         state[1] = xor_bytes(new_state[1],message[(4*i+3)*16:(4*i+4)*16])
         state[0] = xor_bytes(new_state[0],message[(4*i+2)*16:(4*i+3)*16])
-        R2 = R1
-        R1 = xor_bytes(R0,message[(4*i+1)*16:(4*i+2)*16])
-        R0 = message[(4*i+2)*16:(4*i+3)*16] 
+        if version == 1:
+            R2 = R1
+            R1 = R0
+            R0 = xor_bytes(RR,message[(4*i+1)*16:(4*i+2)*16])
+            RR = message[(4*i+2)*16:(4*i+3)*16] 
+        else:
+            R2 = R1
+            R1 = xor_bytes(R0,message[(4*i+1)*16:(4*i+2)*16])
+            R0 = message[(4*i+2)*16:(4*i+3)*16] 
         if verbose:
             printState(state[0])
     return state
         
-
         
 
-def lemac(key, nonce, message, verbose=False):
+def lemac(key, nonce, message, verbose=False, version=1):
     # Copy message because we modify it
     message = message[:]
     # Padding
@@ -111,7 +122,7 @@ def lemac(key, nonce, message, verbose=False):
     nonce_key_2 = AES(key).encrypt_block(get_constant(28))
     
 
-    state = lemac_UHF(init_state, message, verbose)
+    state = lemac_UHF(init_state, message, verbose, version)
 
     if verbose:
         printState(state[0])
