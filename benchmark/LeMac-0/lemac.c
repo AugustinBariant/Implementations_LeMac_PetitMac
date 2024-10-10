@@ -15,6 +15,7 @@ along with this software. If not, see
 */
 
 /* NOTES 
+ - This file implements LeMac-0, the erroneous version in the inital paper
  - Assumes that the message size is a multiple of 8bits
  - Assumes that endianness matches the hardware
  */

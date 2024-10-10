@@ -15,6 +15,8 @@ along with this software. If not, see
 */
 
 /* NOTES 
+ - This file implements the correct version of LeMac, fixing a mistake
+   in the message schedule in the original specification
  - Assumes that the message size is a multiple of 8bits
  - Assumes that endianness matches the hardware
  - WARNING! This implementation is only valid for long messages!
