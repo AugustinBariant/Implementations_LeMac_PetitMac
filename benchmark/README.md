@@ -74,10 +74,14 @@ The following MACs are included for benchmarking:
 
 - aegis128: implementation `aesni` from supercop
 - aegis128l: implementation `aesnic` from supercop
-- GCM: implementation `dolbeau/aesenc-int` from supercop, and 
+- aegis128x2: implementation `aesni` from supercop
+- EliMAC: AVX implementation from https://github.com/jedisct1/elimac
+- GCM: implementation `dolbeau/aesenc-int` from supercop
+- HiAE: reference implementation
 - The Jean-Nikolić construction: implementation based on LeMac implementation
 - Rocca: reference code from the ePrint paper: https://eprint.iacr.org/2022/116.pdf
 - Rocca-S: reference code from the draft RFC: https://www.ietf.org/archive/id/draft-nakano-rocca-s-05.html
+- smac1x8: implementation from https://github.com/jedisct1/smac
 - Tiaoxin: implementation `aesnim` from supercop
 
 Original supercop implementations can be obtained by downloading https://bench.cr.yp.to/supercop/supercop-20240909.tar.xz
