@@ -237,7 +237,7 @@ int crypto_aead_encrypt(
     aegis128L_initialization(k, npub, state); 
 
     //process the associated data 
-    for (i = 0; (i+128) <= adlen; i = i+128)   
+    for (i = 0; (i+32) <= adlen; i = i+32)
     {   
         //The first 32-byte    
         msg0 = _mm_loadu_si128((__m128i*)(ad+i));
@@ -259,72 +259,14 @@ int crypto_aead_encrypt(
         state[4] = _mm_xor_si128(state[4],msg1);  
 
         
-        //The second 32-byte 
-        msg2 = _mm_loadu_si128((__m128i*)(ad+i+32));
-        msg3 = _mm_loadu_si128((__m128i*)(ad+i+48));
-
-        //state update function
-        tmp = state[7];
-        state[7] = _mm_aesenc_si128(state[6],state[7]);
-        state[6] = _mm_aesenc_si128(state[5],state[6]);
-        state[5] = _mm_aesenc_si128(state[4],state[5]);
-        state[4] = _mm_aesenc_si128(state[3],state[4]);
-        state[3] = _mm_aesenc_si128(state[2],state[3]);
-        state[2] = _mm_aesenc_si128(state[1],state[2]);
-        state[1] = _mm_aesenc_si128(state[0],state[1]);
-        state[0] = _mm_aesenc_si128(tmp,state[0]);
-
-        //message is used to update the state.
-        state[0] = _mm_xor_si128(state[0],msg2);
-        state[4] = _mm_xor_si128(state[4],msg3);    
-
-
-        //The third 32-byte    
-        msg0 = _mm_loadu_si128((__m128i*)(ad+i+64));
-        msg1 = _mm_loadu_si128((__m128i*)(ad+i+80));
-
-        //state update function
-        tmp = state[7];
-        state[7] = _mm_aesenc_si128(state[6],state[7]);
-        state[6] = _mm_aesenc_si128(state[5],state[6]);
-        state[5] = _mm_aesenc_si128(state[4],state[5]);
-        state[4] = _mm_aesenc_si128(state[3],state[4]);
-        state[3] = _mm_aesenc_si128(state[2],state[3]);
-        state[2] = _mm_aesenc_si128(state[1],state[2]);
-        state[1] = _mm_aesenc_si128(state[0],state[1]);
-        state[0] = _mm_aesenc_si128(tmp,state[0]);
-
-        //message is used to update the state.
-        state[0] = _mm_xor_si128(state[0],msg0);
-        state[4] = _mm_xor_si128(state[4],msg1);  
-
-        
-        //The fourth 32-byte 
-        msg2 = _mm_loadu_si128((__m128i*)(ad+i+96));
-        msg3 = _mm_loadu_si128((__m128i*)(ad+i+112));
-
-        //state update function
-        tmp = state[7];
-        state[7] = _mm_aesenc_si128(state[6],state[7]);
-        state[6] = _mm_aesenc_si128(state[5],state[6]);
-        state[5] = _mm_aesenc_si128(state[4],state[5]);
-        state[4] = _mm_aesenc_si128(state[3],state[4]);
-        state[3] = _mm_aesenc_si128(state[2],state[3]);
-        state[2] = _mm_aesenc_si128(state[1],state[2]);
-        state[1] = _mm_aesenc_si128(state[0],state[1]);
-        state[0] = _mm_aesenc_si128(tmp,state[0]);
-
-        //message is used to update the state.
-        state[0] = _mm_xor_si128(state[0],msg2);
-        state[4] = _mm_xor_si128(state[4],msg3);    
      }  
 
     // Deal with the partial block    
     // In this program, we assume that the message length is multiple of bytes.
     if (  (adlen & 0x7f) != 0 ) aegis128L_ad_partial(state, ad + i, adlen & 0x7f);     
 
-    // encrypt the message  
-    for (i = 0; (i+128) <= mlen; i = i+128) 
+    // encrypt the message
+    for (i = 0; (i+64) <= mlen; i = i+64)
     {   
         //encrypt 32 bytes: the first  
         msg0 = _mm_loadu_si128((__m128i*)(m+i)); 

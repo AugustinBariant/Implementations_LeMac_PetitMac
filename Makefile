@@ -1,4 +1,4 @@
-CFLAGS= -Wall -Wextra -O3 -g -march=native
+CFLAGS= -Wall -Wextra -O3 -g -march=native -fno-lto
 
 all: lemac.so petitmac.so
 

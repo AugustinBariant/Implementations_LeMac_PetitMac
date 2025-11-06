@@ -100,7 +100,10 @@ int main() {
   int cycles[1000];
   uint8_t Z = 0;
   for (int i=0; i<1000; i++) {
-    getrandom(N, sizeof(N), 0);
+    if (getrandom(N, sizeof(N), 0) != sizeof(N)) {
+      fprintf(stderr, "getrandom failed\n");
+      exit(1);
+    }
 #ifdef PERF_EV
     ioctl(fd, PERF_EVENT_IOC_RESET, 0);
     ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);

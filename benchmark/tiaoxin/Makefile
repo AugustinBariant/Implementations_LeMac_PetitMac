@@ -1,3 +1,11 @@
-CFLAGS= -Wall -Wextra -O3 -march=native
+CFLAGS= -Wall -Wextra -O3 -march=native -fno-lto
 
-bench: bench.o tiaoxin-optimized.o
+all: bench
+
+bench: bench.c
+	$(CC) $(CFLAGS) -o $@ $^
+
+clean:
+	rm -f bench *.o
+
+.PHONY: all clean
